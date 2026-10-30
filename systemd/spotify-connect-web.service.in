@@ -1,0 +1,14 @@
+[Unit]
+Description=Spotify Connect Speaker - pagina local (Web Playback SDK)
+After=network-online.target pipewire-pulse.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@APPDIR@
+ExecStart=/usr/bin/python3 @APPDIR@/server.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

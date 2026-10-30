@@ -1,0 +1,16 @@
+# segredo: client_id + refresh_token do Spotify
+web/config.js
+
+# log do navegador (gerado em runtime)
+browser.log
+*.log
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+
+# editores
+.vscode/
+.idea/
+*.swp

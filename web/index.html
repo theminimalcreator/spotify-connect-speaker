@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>linucao — Spotify Connect</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    font-family: system-ui, -apple-system, "Noto Sans", sans-serif;
+    background: radial-gradient(circle at 50% 0%, #1c1c1c 0%, #0c0c0c 70%);
+    color: #e8e8e8; padding: 1.5rem 1rem;
+  }
+  .card {
+    width: 100%; max-width: 560px; background: #181818; border: 1px solid #282828;
+    border-radius: 16px; padding: 1.5rem; box-shadow: 0 18px 50px #000a;
+  }
+  .head { display: flex; align-items: center; gap: .55rem; margin-bottom: 1.2rem; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #f0a500; flex: none; }
+  .dot.ok { background: #1db954; box-shadow: 0 0 12px #1db95488; }
+  .dot.err { background: #e22134; }
+  .head h1 { margin: 0; font-size: .95rem; letter-spacing: .02em; font-weight: 600; }
+  .head .dev { margin-left: auto; font-size: .72rem; color: #6f6f6f; font-family: ui-monospace, monospace; }
+
+  .now { display: flex; gap: 1rem; align-items: center; margin-bottom: 1.1rem; }
+  #art {
+    width: 92px; height: 92px; border-radius: 10px; flex: none; background: #242424;
+    object-fit: cover; box-shadow: 0 6px 18px #0008;
+  }
+  #art[hidden] { display: block; opacity: 0; }
+  .meta { min-width: 0; }
+  #title { font-size: 1.05rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #artist { font-size: .87rem; color: #b3b3b3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: .15rem; }
+  #album { font-size: .78rem; color: #6f6f6f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: .1rem; }
+  #status { font-size: .78rem; color: #8a8a8a; margin-top: .45rem; }
+
+  .bar { display: flex; align-items: center; gap: .6rem; font-size: .7rem; color: #8a8a8a; font-variant-numeric: tabular-nums; }
+  .track { position: relative; flex: 1; height: 6px; background: #333; border-radius: 3px; cursor: pointer; }
+  .track:hover { background: #3f3f3f; }
+  .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: #1db954; border-radius: 3px; }
+  .track:hover .fill { background: #22d45f; }
+
+  .controls { display: flex; align-items: center; justify-content: center; gap: .9rem; margin: 1.15rem 0 .9rem; }
+  button.ctl {
+    background: #242424; color: #e8e8e8; border: 1px solid #303030; border-radius: 50%;
+    width: 46px; height: 46px; display: grid; place-items: center; cursor: pointer;
+    font-size: 1.05rem; transition: background .12s, transform .06s; padding: 0;
+  }
+  button.ctl:hover { background: #303030; }
+  button.ctl:active { transform: scale(.94); }
+  button.ctl.main { width: 58px; height: 58px; background: #1db954; color: #06210f; border-color: #1db954; font-size: 1.3rem; }
+  button.ctl.main:hover { background: #22d45f; }
+
+  .vol { display: flex; align-items: center; gap: .7rem; font-size: .78rem; color: #8a8a8a; }
+  .vol input[type=range] { flex: 1; accent-color: #1db954; height: 20px; }
+
+  #activate {
+    display: none; margin-top: 1rem; width: 100%; cursor: pointer;
+    background: #1db954; color: #06210f; border: 0; border-radius: 999px;
+    padding: .8rem 1rem; font-size: .95rem; font-weight: 700; font-family: inherit;
+  }
+  #activate.done { background: #242424; color: #7a7a7a; cursor: default; }
+
+  details { margin-top: 1rem; }
+  summary { cursor: pointer; font-size: .75rem; color: #6f6f6f; }
+  #log {
+    margin: .6rem 0 0; padding: .7rem .8rem; background: #0d0d0d; border-radius: 8px;
+    border: 1px solid #232323; font-family: ui-monospace, monospace; font-size: .72rem;
+    color: #8f8f8f; max-height: 180px; overflow: auto; white-space: pre-wrap;
+  }
+  .keys { margin-top: .9rem; font-size: .72rem; color: #5f5f5f; line-height: 1.7; text-align: center; }
+  kbd { background: #262626; border: 1px solid #343434; border-radius: 4px; padding: .05em .35em; font-family: inherit; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="head">
+    <span class="dot" id="dot"></span>
+    <h1>Spotify Connect</h1>
+    <span class="dev" id="devname">linucao</span>
+  </div>
+
+  <div class="now">
+    <img id="art" alt="" hidden>
+    <div class="meta">
+      <div id="title">Nada tocando</div>
+      <div id="artist">Escolha “linucao” no Spotify</div>
+      <div id="album"></div>
+      <div id="status">Iniciando…</div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <span id="cur">0:00</span>
+    <div class="track" id="seekbar"><div class="fill" id="fill"></div></div>
+    <span id="dur">0:00</span>
+  </div>
+
+  <div class="controls">
+    <button class="ctl" id="prev"  title="Faixa anterior (P)">⏮</button>
+    <button class="ctl main" id="playpause" title="Play/Pause (Espaço)">▶</button>
+    <button class="ctl" id="next"  title="Próxima faixa (N)">⏭</button>
+  </div>
+
+  <div class="vol">
+    <span id="volicon">🔊</span>
+    <input type="range" id="volume" min="0" max="100" value="80" title="Volume">
+    <span id="volval">80%</span>
+  </div>
+
+  <button id="activate">🔊 Ativar áudio nesta aba (clique aqui)</button>
+
+  <div class="keys">
+    <kbd>Espaço</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> 10s · <kbd>N</kbd>/<kbd>P</kbd> faixa · <kbd>↑</kbd><kbd>↓</kbd> volume
+  </div>
+
+  <details>
+    <summary>Log / diagnóstico</summary>
+    <pre id="log"></pre>
+  </details>
+</div>
+
+<script src="config.js"></script>
+<script src="https://sdk.scdn.co/spotify-player.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const dot = $('dot'), statusEl = $('status'), logEl = $('log');
+  const artEl = $('art'), titleEl = $('title'), artistEl = $('artist'), albumEl = $('album');
+  const curEl = $('cur'), durEl = $('dur'), fillEl = $('fill'), seekbar = $('seekbar');
+  const playBtn = $('playpause'), volEl = $('volume'), volVal = $('volval');
+
+  const CFG = window.CFG || {};
+  $('devname').textContent = CFG.device_name || 'linucao';
+
+  function log(msg) {
+    const t = new Date().toLocaleTimeString('pt-BR');
+    logEl.textContent += `[${t}] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+    fetch('/log', { method: 'POST', body: `[${t}] ${msg}` }).catch(() => {});
+  }
+  window.addEventListener('error', (e) => log(`window.onerror: ${e.message} @ ${e.filename}:${e.lineno}`));
+  window.addEventListener('unhandledrejection', (e) => log(`unhandledrejection: ${e.reason && (e.reason.message || e.reason)}`));
+
+  // ---------- token ----------
+  let token = null, expiresAt = 0, inflight = null;
+  async function fetchToken() {
+    const body = new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: CFG.refresh_token,
+      client_id: CFG.client_id
+    });
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body
+    });
+    if (!res.ok) throw new Error(`token HTTP ${res.status}: ${(await res.text()).slice(0, 160)}`);
+    const j = await res.json();
+    token = j.access_token;
+    expiresAt = Date.now() + ((j.expires_in || 3600) - 90) * 1000;
+    log(`token novo (expira em ${j.expires_in}s)`);
+    return token;
+  }
+  async function getToken() {
+    if (token && Date.now() < expiresAt) return token;
+    if (!inflight) inflight = fetchToken().finally(() => { inflight = null; });
+    return inflight;
+  }
+  setInterval(() => { getToken().catch(e => log('refresh falhou: ' + e.message)); }, 25 * 60 * 1000);
+
+  async function checkEme() {
+    if (!navigator.requestMediaKeySystemAccess) return 'sem EME neste navegador';
+    const cfgs = [{
+      initDataTypes: ['cenc'],
+      audioCapabilities: [{ contentType: 'audio/mp4; codecs="mp4a.40.2"', robustness: 'SW_SECURE_CRYPTO' }]
+    }];
+    for (const k of ['com.widevine.alpha', 'org.w3.clearkey']) {
+      try { await navigator.requestMediaKeySystemAccess(k, cfgs); log('EME: ' + k); return null; }
+      catch (e) { log('EME indisponível: ' + k); }
+    }
+    return 'nenhum Key System disponível (Widevine ausente)';
+  }
+
+  // ---------- estado ----------
+  let player = null;
+  let snap = { paused: true, position: 0, duration: 0, track: null };
+  let basePos = 0, baseAt = 0, isPlaying = false, connected = false;
+
+  const fmt = (ms) => {
+    if (!ms || ms < 0) ms = 0;
+    const s = Math.floor(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
+  function livePos() {
+    if (!isPlaying) return basePos;
+    return Math.min(basePos + (performance.now() - baseAt), snap.duration || Infinity);
+  }
+
+  function paint() {
+    const pos = livePos(), dur = snap.duration || 0;
+    curEl.textContent = fmt(pos);
+    durEl.textContent = fmt(dur);
+    fillEl.style.width = dur ? `${Math.min(100, (pos / dur) * 100)}%` : '0%';
+  }
+  setInterval(paint, 250);
+
+  function applyTrack(track) {
+    if (!track) {
+      titleEl.textContent = 'Nada tocando';
+      artistEl.textContent = 'Escolha “linucao” no Spotify';
+      albumEl.textContent = '';
+      artEl.hidden = true;
+      return;
+    }
+    titleEl.textContent = track.name || '—';
+    artistEl.textContent = (track.artists || []).map(a => a.name).join(', ') || '—';
+    albumEl.textContent = (track.album && track.album.name) || '';
+    const img = track.album && track.album.images && track.album.images[0];
+    if (img) { artEl.src = img.url; artEl.hidden = false; } else { artEl.hidden = true; }
+  }
+
+  function setPlayIcon() { playBtn.textContent = isPlaying ? '⏸' : '▶'; }
+
+  async function handleState(st) {
+    if (!st) return;
+    const prevTrackId = snap.track && snap.track.id;
+    snap.duration = st.duration || 0;
+    basePos = st.position || 0;
+    baseAt = performance.now();
+    isPlaying = !st.paused;
+    snap.track = st.track_window && st.track_window.current_track;
+    applyTrack(snap.track);
+    setPlayIcon();
+    if (snap.track && snap.track.id !== prevTrackId) log(`tocando: ${snap.track.name} — ${artistEl.textContent}`);
+    if (typeof st.paused === 'boolean') statusEl.textContent = st.paused ? 'Pausado' : 'Reproduzindo';
+  }
+
+  // ---------- comandos externos ----------
+  async function execute(cmd) {
+    if (!player) return;
+    log('comando: ' + cmd);
+    try {
+      if (cmd === 'playpause') {
+        const st = await player.getCurrentState();
+        if (st && !st.paused) await player.pause(); else await player.resume();
+      } else if (cmd === 'play') await player.resume();
+      else if (cmd === 'pause') await player.pause();
+      else if (cmd === 'next') await player.nextTrack();
+      else if (cmd === 'previous') await player.previousTrack();
+      else if (cmd.startsWith('seek_rel:')) {
+        const d = parseInt(cmd.split(':')[1], 10);
+        const st = await player.getCurrentState();
+        if (st) { const p = Math.max(0, Math.min(st.duration, st.position + d)); basePos = p; baseAt = performance.now(); await player.seek(p); }
+      } else if (cmd.startsWith('seek_abs:')) {
+        const p = Math.max(0, parseInt(cmd.split(':')[1], 10));
+        basePos = p; baseAt = performance.now(); await player.seek(p);
+      } else if (cmd.startsWith('volume:')) {
+        const v = Math.max(0, Math.min(100, parseInt(cmd.split(':')[1], 10)));
+        volEl.value = v; volVal.textContent = v + '%';
+        await player.setVolume(v / 100);
+      }
+      setTimeout(async () => { const st = await player.getCurrentState(); if (st) handleState(st); }, 250);
+    } catch (e) { log('comando falhou (' + cmd + '): ' + e.message); }
+  }
+
+  // pagina informa estado e recebe comandos pendentes
+  setInterval(async () => {
+    const payload = {
+      connected, playing: isPlaying,
+      title: (snap.track && snap.track.name) || '',
+      artist: (snap.track && snap.track.artists || []).map(a => a.name).join(', '),
+      album: (snap.track && snap.track.album && snap.track.album.name) || '',
+      art: (snap.track && snap.track.album && snap.track.album.images && snap.track.album.images[0] || {}).url || '',
+      position: livePos() | 0, duration: snap.duration | 0,
+      volume: parseInt(volEl.value, 10) / 100
+    };
+    try {
+      const r = await fetch('/state', { method: 'POST', body: JSON.stringify(payload) });
+      const j = await r.json();
+      for (const c of (j.commands || [])) await execute(c);
+    } catch (e) { /* servidor local caiu; ignora */ }
+  }, 500);
+
+  // ---------- controles locais ----------
+  playBtn.addEventListener('click', () => execute('playpause'));
+  $('next').addEventListener('click', () => execute('next'));
+  $('prev').addEventListener('click', () => execute('previous'));
+
+  seekbar.addEventListener('click', async (ev) => {
+    if (!snap.duration || !player) return;
+    const r = seekbar.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+    await execute('seek_abs:' + Math.round(pct * snap.duration));
+  });
+
+  volEl.addEventListener('input', () => {
+    volVal.textContent = volEl.value + '%';
+    if (player) player.setVolume(volEl.value / 100);
+  });
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.target.tagName === 'INPUT' && ev.key !== ' ') return;
+    const k = ev.key.toLowerCase();
+    if (k === ' ') { ev.preventDefault(); execute('playpause'); }
+    else if (k === 'arrowright') { ev.preventDefault(); execute('seek_rel:10000'); }
+    else if (k === 'arrowleft') { ev.preventDefault(); execute('seek_rel:-10000'); }
+    else if (k === 'arrowup') { ev.preventDefault(); var v = Math.min(100, parseInt(volEl.value, 10) + 5); volEl.value = v; volEl.dispatchEvent(new Event('input')); }
+    else if (k === 'arrowdown') { ev.preventDefault(); var v2 = Math.max(0, parseInt(volEl.value, 10) - 5); volEl.value = v2; volEl.dispatchEvent(new Event('input')); }
+    else if (k === 'n') execute('next');
+    else if (k === 'p') execute('previous');
+  });
+
+  // ---------- boot ----------
+  window.onSpotifyWebPlaybackSDKReady = async () => {
+    log('SDK carregado');
+    const emeErr = await checkEme();
+    if (emeErr) { dot.className = 'dot err'; statusEl.textContent = emeErr; return; }
+    try { await getToken(); } catch (e) { dot.className = 'dot err'; statusEl.textContent = 'Falha de token: ' + e.message; return; }
+
+    volEl.value = Math.round((CFG.volume != null ? CFG.volume : 0.8) * 100);
+    volVal.textContent = volEl.value + '%';
+
+    player = new Spotify.Player({
+      name: CFG.device_name || 'linucao',
+      volume: CFG.volume != null ? CFG.volume : 0.8,
+      getOAuthToken: (cb) => { getToken().then(cb).catch(e => log('getOAuthToken falhou: ' + e.message)); }
+    });
+
+    player.addListener('ready', ({ device_id }) => {
+      connected = true; dot.className = 'dot ok';
+      statusEl.textContent = 'Pronto — disponível como ' + (CFG.device_name || 'linucao');
+      log('ready, device_id=' + device_id);
+    });
+    player.addListener('not_ready', ({ device_id }) => {
+      connected = false; dot.className = 'dot err';
+      statusEl.textContent = 'Desconectado — tentando reconectar…'; log('not_ready ' + device_id);
+    });
+    player.addListener('player_state_changed', handleState);
+    player.addListener('initialization_error', ({ message }) => { dot.className = 'dot err'; statusEl.textContent = 'Erro de inicialização: ' + message; log('initialization_error: ' + message); });
+    player.addListener('authentication_error', ({ message }) => { dot.className = 'dot err'; statusEl.textContent = 'Erro de autenticação: ' + message; log('authentication_error: ' + message); });
+    player.addListener('account_error', ({ message }) => { dot.className = 'dot err'; statusEl.textContent = 'Erro de conta (precisa Premium): ' + message; log('account_error: ' + message); });
+    player.addListener('playback_error', ({ message }) => { statusEl.textContent = 'Erro de reprodução: ' + message; log('playback_error: ' + message); });
+
+    const btn = $('activate');
+    btn.style.display = 'block';
+    btn.addEventListener('click', async () => {
+      try { if (typeof player.activateElement === 'function') await player.activateElement(); log('activateElement ok'); }
+      catch (e) { log('activateElement falhou: ' + e.message); }
+      btn.classList.add('done'); btn.textContent = '🔊 Áudio ativado';
+      const st = await player.getCurrentState();
+      if (st) { handleState(st); if (st.paused) { await player.resume(); log('resume()'); } }
+      else log('nada carregado ainda — mande play do celular');
+    });
+
+    const ok = await player.connect();
+    log('connect() -> ' + ok);
+    if (!ok) { dot.className = 'dot err'; statusEl.textContent = 'Não consegui conectar ao Spotify'; }
+  };
+})();
+</script>
+</body>
+</html>

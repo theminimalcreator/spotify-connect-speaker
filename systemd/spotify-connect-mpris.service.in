@@ -1,0 +1,14 @@
+[Unit]
+Description=Spotify Connect Speaker - bridge MPRIS (teclas de midia / widget do Plasma)
+After=spotify-connect-web.service
+Wants=spotify-connect-web.service
+
+[Service]
+Type=simple
+WorkingDirectory=@APPDIR@
+ExecStart=/usr/bin/python3 @APPDIR@/mpris.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
