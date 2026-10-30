@@ -84,6 +84,12 @@ else
   code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:${PORT}/" || true)
   [ "$code" = "200" ] && ok "GET / (HTTP 200)" || bad "GET / retornou HTTP $code"
 
+  if systemctl --user is-active --quiet spotify-connect-browser.service 2>/dev/null; then
+    ok "spotify-connect-browser (Firefox headless) ativo"
+  else
+    skip "spotify-connect-browser inativo (rode ./install.sh)"
+  fi
+
   if systemctl --user is-active --quiet spotify-connect-mpris.service 2>/dev/null; then
     ok "spotify-connect-mpris ativo"
     if command -v gdbus >/dev/null; then

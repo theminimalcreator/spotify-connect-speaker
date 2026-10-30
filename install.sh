@@ -11,6 +11,7 @@ URL="http://127.0.0.1:${PORT}/"
 NAME="${SPOTIFY_DEVICE_NAME:-linucao}"
 UNITDIR="$HOME/.config/systemd/user"
 APPDIR_DESKTOP="$HOME/.local/share/applications"
+PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/spotify-connect/profile"
 
 say() { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[!]\033[0m %s\n' "$*"; }
@@ -18,6 +19,7 @@ die() { printf '\033[1;31m[x]\033[0m %s\n' "$*" >&2; exit 1; }
 
 # ---------- pre-requisitos ----------
 command -v python3 >/dev/null || die "python3 nao encontrado"
+command -v firefox >/dev/null || die "firefox nao encontrado (e o player; roda headless)"
 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)' \
   || die "python3 >= 3.8 necessario"
 
@@ -37,20 +39,27 @@ else
   say "web/config.js ja existe (mantido)"
 fi
 
+# ---------- perfil dedicado do Firefox headless ----------
+mkdir -p "$PROFILE"
+cp "$APPDIR/browser/user.js" "$PROFILE/user.js"
+say "perfil do navegador: $PROFILE"
+
 # ---------- units do systemd ----------
 mkdir -p "$UNITDIR"
 say "instalando units em $UNITDIR"
-for unit in web mpris; do
+for unit in web mpris browser; do
   src="$APPDIR/systemd/spotify-connect-${unit}.service.in"
   dst="$UNITDIR/spotify-connect-${unit}.service"
-  sed "s|@APPDIR@|$APPDIR|g" "$src" > "$dst"
+  sed -e "s|@APPDIR@|$APPDIR|g" -e "s|@PROFILE@|$PROFILE|g" -e "s|@URL@|$URL|g" "$src" > "$dst"
   echo "    $dst"
 done
 
 systemctl --user daemon-reload
-systemctl --user enable spotify-connect-web.service spotify-connect-mpris.service >/dev/null
+systemctl --user enable spotify-connect-web.service spotify-connect-mpris.service \
+  spotify-connect-browser.service >/dev/null
 systemctl --user restart spotify-connect-web.service
 systemctl --user restart spotify-connect-mpris.service
+systemctl --user restart spotify-connect-browser.service
 sleep 2
 
 # ---------- atalho ----------
@@ -69,21 +78,23 @@ code=$(curl -s -o /dev/null -w '%{http_code}' "$URL" || true)
                     || die "servidor web nao respondeu (HTTP $code)"
 systemctl --user is-active --quiet spotify-connect-mpris.service \
   && echo "    bridge MPRIS ....... OK" || warn "bridge MPRIS inativo"
+systemctl --user is-active --quiet spotify-connect-browser.service \
+  && echo "    Firefox headless ... OK" \
+  || warn "Firefox headless inativo (journalctl --user -u spotify-connect-browser)"
 
 cat <<EOF
 
 $(say "pronto")
 
-  1. Abra:  $URL     (ou o atalho "Spotify Connect ($NAME)" no menu)
-  2. Clique em "Ativar audio nesta aba"  <- o Firefox exige um gesto
-  3. No celular: lista de dispositivos -> $NAME -> play
+  O Firefox roda headless como servico: nao ha janela nem aba para manter aberta.
+
+  1. No celular: lista de dispositivos -> $NAME -> play
+  2. (opcional) o widget "Controle de midia" do Plasma mostra faixa e botoes
 
 Lembretes:
-  * a aba precisa ficar aberta; se fechar, o dispositivo sai da lista
-  * depois de um F5, re-selecione "$NAME" no celular (o device_id muda)
-  * teclas de midia funcionam com a aba em segundo plano (via MPRIS)
-
-Para abrir a aba sozinho no login:
-  mkdir -p ~/.config/autostart
-  cp "$APPDIR_DESKTOP/spotify-connect.desktop" ~/.config/autostart/
+  * depois de reiniciar o servico do navegador, re-selecione "$NAME" no celular
+    (o device_id muda a cada carregamento da pagina)
+  * para ver a UI: abra $URL num navegador comum (cria um 2o dispositivo;
+    feche-o depois)
+  * logs: tail -f $APPDIR/browser.log
 EOF

@@ -1,0 +1,15 @@
+[Unit]
+Description=Spotify Connect Speaker - Firefox headless (Web Playback SDK + Widevine)
+After=spotify-connect-web.service pipewire-pulse.service
+Requires=spotify-connect-web.service
+
+[Service]
+Type=simple
+# unit de usuario nao herda /etc/profile.d: o caminho do Widevine vai explicito
+Environment=MOZ_GMP_PATH=/var/lib/widevine/gmp-widevinecdm/system-installed:/usr/lib64/mozilla/plugins/gmp-gmpopenh264/system-installed
+ExecStart=/usr/bin/firefox --headless --no-remote --profile @PROFILE@ @URL@
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

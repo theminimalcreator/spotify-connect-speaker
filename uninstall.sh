@@ -12,10 +12,11 @@ APPDIR_DESKTOP="$HOME/.local/share/applications"
 APPDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "==> parando e desabilitando servicos"
+systemctl --user disable --now spotify-connect-browser.service 2>/dev/null || true
 systemctl --user disable --now spotify-connect-mpris.service 2>/dev/null || true
 systemctl --user disable --now spotify-connect-web.service 2>/dev/null || true
 
-rm -fv "$UNITDIR/spotify-connect-mpris.service" "$UNITDIR/spotify-connect-web.service"
+rm -fv "$UNITDIR/spotify-connect-browser.service" "$UNITDIR/spotify-connect-mpris.service" "$UNITDIR/spotify-connect-web.service"
 rm -fv "$APPDIR_DESKTOP/spotify-connect.desktop"
 rm -fv "$HOME/.config/autostart/spotify-connect.desktop"
 rm -fv "$APPDIR/browser.log"
@@ -26,6 +27,7 @@ update-desktop-database "$APPDIR_DESKTOP" 2>/dev/null || true
 if [ "$PURGE" = "1" ]; then
   echo "==> removendo web/config.js (contem o refresh_token)"
   rm -fv "$APPDIR/web/config.js"
+  rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/spotify-connect"
 else
   echo "==> web/config.js mantido (use --purge para remover)"
 fi

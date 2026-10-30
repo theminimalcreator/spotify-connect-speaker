@@ -2,7 +2,7 @@
 Type=Application
 Name=Spotify Connect (@NAME@)
 Comment=Transforma esta maquina em caixa de som do Spotify
-Exec=firefox --new-window @URL@
+Exec=xdg-open @URL@
 Icon=multimedia-volume-control
 Terminal=false
 Categories=AudioVideo;Audio;Player;

@@ -7,11 +7,12 @@ neste repositório. Leia antes de propor mudanças.
 
 Transforma um PC Linux em uma **caixa de som do Spotify Connect** (aparece na
 lista de dispositivos do celular como uma Alexa). O áudio sai por uma página com
-o **Web Playback SDK** aberta no Firefox, descriptografada pelo **Widevine**.
+o **Web Playback SDK** rodando num **Firefox headless** (serviço systemd, sem
+janela), descriptografado pelo **Widevine**.
 
-Não é uma lib nem um serviço de longa duração: é um servidor HTTP local
-(127.0.0.1:8099) que serve uma página, mais uma ponte D-Bus/MPRIS para as teclas
-de mídia. O "player" real é o navegador.
+É um servidor HTTP local (127.0.0.1:8099) que serve uma página, uma ponte
+D-Bus/MPRIS para as teclas de mídia e o Firefox headless que a carrega. O
+"player" real é o navegador.
 
 ## Decisão de arquitetura — não desfaça
 
@@ -35,19 +36,20 @@ Também não tente implementar descriptografia local: quem decodifica é o CDM
 | Arquivo | Papel | Restrições |
 |---|---|---|
 | `web/index.html` | SDK do Spotify, UI, teclado, polling de comandos | arquivo único, sem build, sem bundler |
+| `browser/user.js` | prefs do perfil dedicado do Firefox headless | copiado pelo `install.sh` para `~/.local/share/spotify-connect/profile` |
 | `server.py` | serve `web/`, fila de comandos, log do browser | **só stdlib** |
 | `mpris.py` | exporta `org.mpris.MediaPlayer2.<device>` | `python3-dbus` + `PyGObject` (pacotes do sistema) |
 | `scripts/gen-config.py` | gera/valida `web/config.js` | só stdlib |
 | `scripts/check.sh` | verificação do repo (sintaxe, SPDX, segredo, saúde) | sai 0 só se tudo passar |
 | `install.sh` / `uninstall.sh` | instala/remove units + atalho | idempotentes |
-| `systemd/*.service.in` | templates com `@APPDIR@` | substituído pelo `install.sh` |
-| `desktop/*.desktop.in` | atalho no menu | `@URL@`, `@NAME@` |
+| `systemd/*.service.in` | templates: `web`, `mpris`, `browser` | `@APPDIR@`, `@PROFILE@`, `@URL@` substituídos pelo `install.sh` |
+| `desktop/*.desktop.in` | atalho no menu (abre a UI via `xdg-open`) | `@URL@`, `@NAME@` |
 | `web/config.js` | **SEGREDO** (client_id + refresh_token) | 0600, gitignored, nunca imprimir |
 
 ## Fluxo de dados
 
 ```
-celular --Spotify Connect--> Firefox (SDK + Widevine) --> PipeWire --> alto-falantes
+celular --Spotify Connect--> Firefox headless (SDK + Widevine) --> PipeWire --> alto-falantes
                                    |
                                    | POST /state  (a cada 500 ms, carrega o estado
                                    |               e recebe {"commands": [...]})
@@ -85,10 +87,14 @@ Comandos aceitos (string simples): `playpause`, `play`, `pause`, `next`,
 3. **O `device_id` do SDK muda a cada carregamento da página.** É a causa nº 1
    de "apareceu mas ficou mudo": depois de um F5 é preciso re-selecionar o
    dispositivo no celular. Não tente persistir/forjar `device_id`.
-4. **Autoplay exige gesto do usuário.** O botão "Ativar áudio" chama
-   `player.activateElement()`. Se você remover esse botão, o dispositivo aparece,
-   recebe comandos, troca de faixa — e não sai som nenhum.
-5. **A aba precisa ficar aberta.** Fechou, o dispositivo sai da lista do Spotify.
+4. **Autoplay.** No Firefox headless ele é liberado por pref do perfil
+   (`media.autoplay.default=0` em `browser/user.js`). Em qualquer outro navegador
+   ainda vale o gesto do usuário: o botão "Ativar áudio" chama
+   `player.activateElement()`. **Não remova o botão** (fallback) nem as prefs:
+   sem um dos dois, o dispositivo aparece, troca de faixa — e não sai som.
+5. **O navegador precisa estar rodando.** Parou `spotify-connect-browser`, o
+   dispositivo sai da lista do Spotify. Não abra a página num segundo navegador:
+   cria um 2º dispositivo e as duas instâncias disputam o `/state`.
 6. **`web/config.js` nunca entra no git.** Contém refresh token. O `.gitignore`
    cobre; não use `git add -f`.
 7. **`python3` só stdlib em `server.py` e nos scripts.** `mpris.py` pode usar
@@ -98,10 +104,11 @@ Comandos aceitos (string simples): `playpause`, `play`, `pause`, `next`,
 
 ```bash
 ./install.sh                               # instala/atualiza units + atalho + config
-systemctl --user status spotify-connect-web spotify-connect-mpris
+systemctl --user status spotify-connect-web spotify-connect-mpris spotify-connect-browser
 curl -s http://127.0.0.1:8099/health
 curl -s http://127.0.0.1:8099/state | python3 -m json.tool
 tail -f browser.log                        # log do navegador (a página reporta tudo)
+journalctl --user -u spotify-connect-browser -f   # saída do processo Firefox
 
 # controle local, sem tocar no navegador
 gdbus call --session --dest org.mpris.MediaPlayer2.linucao \
@@ -112,6 +119,11 @@ gdbus call --session --dest org.mpris.MediaPlayer2.linucao \
 pactl list sink-inputs | grep -A5 -i firefox
 ```
 
+Para testar o navegador à mão (com o serviço parado) use o mesmo comando da unit:
+`firefox --headless --no-remote --profile <dir> http://127.0.0.1:8099/` com
+`MOZ_GMP_PATH` apontando para o Widevine. **Nunca use `pkill -f` com o caminho do
+perfil no mesmo comando de shell** — ele mata o próprio shell.
+
 **Antes de terminar qualquer mudança, rode:**
 
 ```bash
@@ -120,7 +132,8 @@ pactl list sink-inputs | grep -A5 -i firefox
 
 Cobre sintaxe (python, bash, o `<script>` inline do HTML), presença dos
 cabeçalhos SPDX, que `web/config.js` não está no índice do git e — se os
-serviços estiverem no ar — `/health`, `GET /` e a resposta do D-Bus. Sai 0 só se
+serviços estiverem no ar — `/health`, `GET /`, o serviço do navegador e a
+resposta do D-Bus. Sai 0 só se
 tudo passar; `skip` é aceitável (ex.: `node` ou serviços ausentes).
 
 Se mexeu no `mpris.py`, reinicie `spotify-connect-mpris` e confirme que
@@ -150,23 +163,32 @@ gdbus call --session --dest org.mpris.MediaPlayer2.linucao \
 
 Fedora Asahi Remix 44, aarch64 (MacBook Air M2), KDE Plasma em X11, PipeWire
 1.6.8, Firefox 155. Widevine em `/var/lib/widevine` (instalado via
-`sudo widevine-installer`), exposto ao Firefox por `MOZ_GMP_PATH`. Se o log da
-página disser `Widevine ausente`, o CDM não está instalado ou o Firefox precisa
-ser reiniciado.
+`sudo widevine-installer`), exposto ao Firefox por `MOZ_GMP_PATH`. Unit de
+usuário **não** herda `/etc/profile.d`, por isso a `spotify-connect-browser`
+define `MOZ_GMP_PATH` explicitamente. Se o log da página disser `Widevine
+ausente`, o CDM não está instalado ou o serviço do navegador precisa ser
+reiniciado.
+
+Validado: Firefox `--headless` toca com Widevine, sem janela, no perfil dedicado.
+Chromium **não** foi testado (não instalado; a CDM em `/var/lib/widevine` é a do
+Firefox) — só tente se o headless do Firefox regredir.
 
 ## Armadilhas conhecidas
 
 | Sintoma | Causa |
 |---|---|
-| Aparece na lista, nada toca | falta o clique em "Ativar áudio" (autoplay) |
+| Aparece na lista, nada toca | navegador comum sem o clique em "Ativar áudio"; no headless, perfil sem o `user.js` |
+| Dispositivo não aparece | `spotify-connect-browser` parado |
+| Dois dispositivos `linucao` / estado `connected:false` | página aberta em outro navegador, disputando o `/state` |
 | Mudo depois de recarregar | `device_id` novo; re-selecionar no celular |
-| Dois players no widget do Plasma | `media.hardwaremediakeys.enabled` do Firefox ligado |
+| Dois players no widget do Plasma | `media.hardwaremediakeys.enabled` ligado (no perfil dedicado já é `false`; é o Firefox pessoal) |
 | `GET /` 200 mas página em branco | abriu via `file://` em vez de `127.0.0.1` |
 | Comando pela tecla não chega | `spotify-connect-mpris` parado, ou `mpris.py` sem `dbus` |
 | `install.sh` falha no meio | units apontam para caminho antigo: rodar `install.sh` de novo após mover o repo |
+| Mudou `browser/user.js` e nada mudou | rodar `install.sh` (copia para o perfil) e reiniciar `spotify-connect-browser` |
 
 ## Fora de escopo
 
 Não implemente sem pedido explícito: empacotamento (RPM/Flatpak/AUR), suporte a
-Chromium além do que já funciona, autenticação multiusuário, TLS, ou qualquer
+Chromium, migração para Rust (avaliada: ganho marginal, o gargalo é o navegador), autenticação multiusuário, TLS, ou qualquer
 coisa que dependa de credenciais Spotify embutidas no código.
