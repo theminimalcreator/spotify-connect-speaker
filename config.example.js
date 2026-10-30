@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Guilherme Zaia
+//
 // Arquivo de exemplo. O `install.sh` gera o web/config.js real.
 //
 // client_id    : app publico do Spotify. O padrao abaixo e o do ncspot, que ja

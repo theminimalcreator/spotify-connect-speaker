@@ -213,3 +213,43 @@ O painel **"Log / diagnóstico"** na página mostra `EME`, refresh de token,
 - Se o Spotify algum dia liberar a chave AES para implementações open-source,
   `librespot` volta a ser a solução mais leve (sem navegador). Ver
   [`docs/diagnostico-librespot.md`](docs/diagnostico-librespot.md).
+
+---
+
+## Licença
+
+Copyright (C) 2026 Guilherme Zaia.
+
+Este projeto é software livre distribuído sob a **GNU General Public License,
+versão 3** (`GPL-3.0-only`). O texto integral está em [`LICENSE`](LICENSE).
+
+Em resumo:
+
+- você pode usar, estudar, modificar e redistribuir livremente
+- se **distribuir** uma versão modificada, ela tem que continuar sob GPL-3.0 e
+  com o código-fonte disponível
+- uso privado e uso interno **não** obrigam publicação de nada
+
+Cada arquivo-fonte carrega a linha `SPDX-License-Identifier: GPL-3.0-only` para
+que ferramentas identifiquem a licença automaticamente. Para relicenciar como
+`GPL-3.0-or-later` (versão 3 ou qualquer posterior), basta trocar esse
+identificador em todos os arquivos:
+
+```bash
+grep -rl 'GPL-3.0-only' --exclude-dir=.git . \
+  | xargs sed -i 's/GPL-3.0-only/GPL-3.0-or-later/'
+```
+
+### Componentes de terceiros
+
+A licença cobre **apenas o código deste repositório**. Em tempo de execução ele
+usa dois componentes proprietários que **não** são distribuídos nem linkados aqui:
+
+| Componente | Licença | Como é usado |
+|---|---|---|
+| [Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk) | proprietária (Spotify) | carregado do CDN `sdk.scdn.co` pelo navegador |
+| Widevine CDM | proprietária (Google) | plugin EME do próprio navegador |
+
+Como não há linkage nem redistribuição desses binários, não há conflito de
+licença. O usuário precisa de uma conta Spotify Premium e é responsável por
+cumprir os Termos de Uso do Spotify ao usá-los.

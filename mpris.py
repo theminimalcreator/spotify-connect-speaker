@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Guilherme Zaia
 """Bridge MPRIS2 <-> pagina do Spotify Connect.
 
 Exporta org.mpris.MediaPlayer2.linucao no barramento de sessao, para que

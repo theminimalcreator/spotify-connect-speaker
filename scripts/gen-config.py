@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Guilherme Zaia
 """Gera web/config.js com client_id + refresh_token para o Web Playback SDK.
 
 O SDK exige um access token de usuario com o scope `streaming`. A forma mais

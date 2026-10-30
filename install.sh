@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Guilherme Zaia
 # Instala/atualiza o Spotify Connect Speaker na sessao do usuario.
 # Idempotente: pode rodar quantas vezes quiser.
 set -euo pipefail
