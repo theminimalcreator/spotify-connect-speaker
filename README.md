@@ -194,6 +194,18 @@ O painel **"Log / diagnóstico"** na página mostra `EME`, refresh de token,
 
 ---
 
+## Desenvolvimento
+
+Instruções para agentes de código — e para humanos que forem mexer — estão em
+[`AGENTS.md`](AGENTS.md): mapa dos arquivos, fluxo de dados, as invariantes que
+não podem ser quebradas e as armadilhas conhecidas.
+
+```bash
+./scripts/check.sh   # sintaxe, cabeçalhos SPDX, segredo fora do git, saúde dos serviços
+```
+
+---
+
 ## Desinstalar
 
 ```bash
